@@ -160,6 +160,7 @@ psplash_fb_new (int angle)
   fb->real_width  = fb->width  = fb_var.xres;
   fb->real_height = fb->height = fb_var.yres;
   fb->bpp    = fb_var.bits_per_pixel;
+  fb->depth  = fb_var.red.length + fb_var.green.length + fb_var.blue.length;
   fb->stride = fb_fix.line_length;
   fb->type   = fb_fix.type;
   fb->visual = fb_fix.visual;
@@ -308,13 +309,18 @@ psplash_fb_plot_pixel (PSplashFB    *fb,
         break;
       }
   } else if (fb->rgbmode == BGR565 || fb->rgbmode == BGR888) {
-    switch (fb->bpp)
+    switch (fb->depth)
       {
       case 24:
       case 32:
         *(fb->data + off)     = red;
         *(fb->data + off + 1) = green;
         *(fb->data + off + 2) = blue;
+        break;
+      case 18:
+        *(fb->data + off)     = (red >> 2) | ((green & 0x0C) << 4);
+        *(fb->data + off + 1) = ((green & 0xF0) >> 4) | ((blue & 0x3C) << 2);
+        *(fb->data + off + 2) = (blue & 0xC0) >> 6;
         break;
       case 16:
         *(volatile uint16_t *) (fb->data + off)

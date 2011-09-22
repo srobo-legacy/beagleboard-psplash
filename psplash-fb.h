@@ -34,6 +34,7 @@ typedef struct PSplashFB
   int            visual;		
   int            width, height;
   int            bpp;
+  int            depth;
   int            stride;
   char		*data;
   char		*base;
