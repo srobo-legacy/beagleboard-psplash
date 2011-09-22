@@ -264,7 +264,7 @@ main (int argc, char** argv)
   }
 
   /* Clear the background with #ecece1 */
-  psplash_fb_draw_rect (fb, 0, 0, fb->width, fb->height, 0xec, 0xec, 0xe1);
+  psplash_fb_draw_rect (fb, 0, 0, fb->width, fb->height, 0, 0, 0);
 
   /* Draw the Poky logo  */
   psplash_fb_draw_image (fb, 
