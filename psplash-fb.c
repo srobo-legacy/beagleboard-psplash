@@ -369,6 +369,8 @@ psplash_fb_draw_rect (PSplashFB    *fb,
 	psplash_fb_plot_pixel (fb, x+dx, y+dy, red, green, blue);
 }
 
+#define munge_pixel(p, mask) ( (((uint32_t)p) * mask) / 32  )
+
 void
 psplash_fb_draw_image (PSplashFB    *fb,
 		       int          x,
@@ -376,7 +378,8 @@ psplash_fb_draw_image (PSplashFB    *fb,
 		       int          img_width,
 		       int          img_height,
 		       int          img_bytes_per_pixel,
-		       uint8       *rle_data)
+		       uint8       *rle_data,
+		       uint8_t mask)
 {
   uint8       *p = rle_data;
   int          dx = 0, dy = 0,  total_len;
@@ -398,7 +401,10 @@ psplash_fb_draw_image (PSplashFB    *fb,
 	  do
 	    {
 	      if (img_bytes_per_pixel < 4 || *(p+3))
-	        psplash_fb_plot_pixel (fb, x+dx, y+dy, *(p), *(p+1), *(p+2));
+		      psplash_fb_plot_pixel (fb, x+dx, y+dy, 
+					     munge_pixel((*p), mask),
+					     munge_pixel((*(p+1)), mask),
+					     munge_pixel((*(p+2)), mask) );
 	      if (++dx >= img_width) { dx=0; dy++; }
 	    }
 	  while (--len && (p - rle_data) < total_len);
@@ -412,7 +418,11 @@ psplash_fb_draw_image (PSplashFB    *fb,
 	  do
 	    {
 	      if (img_bytes_per_pixel < 4 || *(p+3))
-	        psplash_fb_plot_pixel (fb, x+dx, y+dy, *(p), *(p+1), *(p+2));
+		      psplash_fb_plot_pixel (fb, x+dx, y+dy,
+					     munge_pixel((*p), mask),
+					     munge_pixel((*(p+1)), mask),
+					     munge_pixel((*(p+2)), mask) );
+
 	      if (++dx >= img_width) { dx=0; dy++; }
 	      p += img_bytes_per_pixel;
 	    }

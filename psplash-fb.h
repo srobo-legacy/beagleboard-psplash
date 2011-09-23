@@ -83,7 +83,8 @@ psplash_fb_draw_image (PSplashFB    *fb,
 		       int          img_width, 
 		       int          img_height,
 		       int          img_bytes_pre_pixel,
-		       uint8       *rle_data);
+		       uint8       *rle_data,
+		       uint8_t mask);
 
 void
 psplash_fb_text_size (PSplashFB          *fb,

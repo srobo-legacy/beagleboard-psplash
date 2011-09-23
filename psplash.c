@@ -25,6 +25,9 @@
 
 #define MSG ""
 
+static uint8_t img_mask = 0;
+static enum { FADE_IN, FADE_OUT } img_fade = FADE_IN;
+
 void
 psplash_exit (int signum)
 {
@@ -49,12 +52,12 @@ psplash_draw_msg (PSplashFB *fb, const char *msg)
 			fb->height - (fb->height/6) - h, 
 			fb->width,
 			h,
-			0xec, 0xec, 0xe1);
+			0, 0, 0);
 
   psplash_fb_draw_text (fb,
 			(fb->width-w)/2, 
 			fb->height - (fb->height/6) - h,
-			0x6d, 0x6d, 0x70,
+			0xff, 0xff, 0xff,
 			&radeon_font,
 			msg);
 }
@@ -111,11 +114,13 @@ parse_command (PSplashFB *fb, char *string, int length)
 
   if (!strcmp(command,"PROGRESS")) 
     {
-      psplash_draw_progress (fb, atoi(strtok(NULL,"\0")));
+	    /* Ignore this */
+	    /* psplash_draw_progress (fb, atoi(strtok(NULL,"\0"))); */
     } 
   else if (!strcmp(command,"MSG")) 
     {
-      psplash_draw_msg (fb, strtok(NULL,"\0"));
+	    /* Ignore this */
+	    /* psplash_draw_msg (fb, strtok(NULL,"\0")); */
     } 
   else if (!strcmp(command,"QUIT")) 
     {
@@ -135,8 +140,8 @@ psplash_main (PSplashFB *fb, int pipe_fd, int timeout)
   char          *end;
   char           command[2048];
 
-  tv.tv_sec = timeout;
-  tv.tv_usec = 0;
+  tv.tv_sec = 0;
+  tv.tv_usec = 50000;
 
   FD_ZERO(&descriptors);
   FD_SET(pipe_fd, &descriptors);
@@ -144,55 +149,69 @@ psplash_main (PSplashFB *fb, int pipe_fd, int timeout)
   end = command;
 
   while (1) 
+  {
+    err = select(pipe_fd+1, &descriptors, NULL, NULL, &tv);
+
+    if (err < 0) 
+      return;
+
+    if (err > 0 )
     {
-      if (timeout != 0) 
-	err = select(pipe_fd+1, &descriptors, NULL, NULL, &tv);
-      else
-	err = select(pipe_fd+1, &descriptors, NULL, NULL, NULL);
-      
-      if (err <= 0) 
-	{
-	  /*
-	  if (errno == EINTR)
-	    continue;
-	  */
-	  return;
-	}
-      
       length += read (pipe_fd, end, sizeof(command) - (end - command));
 
       if (length == 0) 
-	{
-	  /* Reopen to see if there's anything more for us */
-	  close(pipe_fd);
-	  pipe_fd = open(PSPLASH_FIFO,O_RDONLY|O_NONBLOCK);
-	  goto out;
-	}
+      {
+	/* Reopen to see if there's anything more for us */
+	close(pipe_fd);
+	pipe_fd = open(PSPLASH_FIFO,O_RDONLY|O_NONBLOCK);
+	goto out;
+      }
       
       if (command[length-1] == '\0') 
-	{
-	  if (parse_command(fb, command, strlen(command))) 
-	    return;
-	  length = 0;
-	} 
+      {
+	if (parse_command(fb, command, strlen(command))) 
+	  return;
+	length = 0;
+      } 
       else if (command[length-1] == '\n') 
-	{
-	  command[length-1] = '\0';
-	  if (parse_command(fb, command, strlen(command))) 
-	    return;
-	  length = 0;
-	} 
-
-
-    out:
-      end = &command[length];
-    
-      tv.tv_sec = timeout;
-      tv.tv_usec = 0;
-      
-      FD_ZERO(&descriptors);
-      FD_SET(pipe_fd,&descriptors);
+      {
+	command[length-1] = '\0';
+	if (parse_command(fb, command, strlen(command))) 
+	  return;
+	length = 0;
+      } 
     }
+    else
+    {
+      if( img_fade == FADE_IN ) {
+	img_mask += 2;
+	if( img_mask == 32 )
+	  img_fade = FADE_OUT;
+      } else {
+	img_mask -= 2;
+	if( img_mask == 0 )
+	  img_fade = FADE_IN;
+      }
+
+      /* Draw the logo */
+      psplash_fb_draw_image (fb, 
+			     (fb->width  - POKY_IMG_WIDTH)/2, 
+			     (fb->height - POKY_IMG_HEIGHT)/2,
+			     POKY_IMG_WIDTH,
+			     POKY_IMG_HEIGHT,
+			     POKY_IMG_BYTES_PER_PIXEL,
+			     POKY_IMG_RLE_PIXEL_DATA, img_mask);
+    }
+
+  out:
+    end = &command[length];
+    
+    tv.tv_sec = 0;
+    tv.tv_usec = 50000;
+      
+    FD_ZERO(&descriptors);
+    FD_SET(pipe_fd,&descriptors);
+  }
 
   return;
 }
@@ -263,33 +282,13 @@ main (int argc, char** argv)
 	  goto fb_fail;
   }
 
-  /* Clear the background with #ecece1 */
+  /* Set the background to black */
   psplash_fb_draw_rect (fb, 0, 0, fb->width, fb->height, 0, 0, 0);
-
-  /* Draw the Poky logo  */
-  psplash_fb_draw_image (fb, 
-			 (fb->width  - POKY_IMG_WIDTH)/2, 
-			 ((fb->height * 5) / 6 - POKY_IMG_HEIGHT)/2,
-			 POKY_IMG_WIDTH,
-			 POKY_IMG_HEIGHT,
-			 POKY_IMG_BYTES_PER_PIXEL,
-			 POKY_IMG_RLE_PIXEL_DATA);
-
-  /* Draw progress bar border */
-  psplash_fb_draw_image (fb, 
-			 (fb->width  - BAR_IMG_WIDTH)/2, 
-			 fb->height - (fb->height/6), 
-			 BAR_IMG_WIDTH,
-			 BAR_IMG_HEIGHT,
-			 BAR_IMG_BYTES_PER_PIXEL,
-			 BAR_IMG_RLE_PIXEL_DATA);
-
-  psplash_draw_progress (fb, 0);
-
-  psplash_draw_msg (fb, MSG);
 
   psplash_main (fb, pipe_fd, 0);
 
+  /* Clear the display before quitting */
+  psplash_fb_draw_rect (fb, 0, 0, fb->width, fb->height, 0, 0, 0);
 
   psplash_fb_destroy (fb);
 
